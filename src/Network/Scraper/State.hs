@@ -200,10 +200,10 @@ post urlStr params = do
         -- TODO: Display under debug mode
         -- liftIO . print $ params
         -- TODO: Make minimal repro and ask question... not sure how to print something so polymorphic
-        whenM getCurrentDebug . liftIO $ do
-          liftIO . putStrLn $ "POST: " ++ exportURL url ++ "\n"
         absURL <- toAbsUrl url
         let url' = exportURL absURL
+        whenM getCurrentDebug . liftIO $ do
+          liftIO . putStrLn $ "POST: " ++ url' ++ "\n"
 
         r <- liftIO $ Sesh.postWith opts sesh url' params
         -- TODO: On non 200 status look for element with "error" and print text
@@ -219,7 +219,7 @@ post urlStr params = do
 
 toAbsUrl :: URL -> Scraper(URL)
 toAbsUrl u@(URL (Absolute _) _ _) = return u
-toAbsUrl u@(URL _ _ _) = do
+toAbsUrl u@(URL HostRelative _ _) = do
   hostUrl <- getCurrentURL
   case hostUrl of
     Just hostUrl' -> do
@@ -227,7 +227,15 @@ toAbsUrl u@(URL _ _ _) = do
       return absUrl
     Nothing -> throwE errMsg
     where errMsg = "You must 'get' or 'post' to something before making urls absolute"
--- toAbsUrl u@(URL _ _ _) = return u
+toAbsUrl u@(URL PathRelative _ _) = do
+  hostUrl <- getCurrentURL
+  maybe (throwE errMsg) (return . relativeTo) hostUrl
+  where
+    relativeTo hostUrl | null (url_path u) = hostUrl
+    relativeTo hostUrl | otherwise         = u { url_type = url_type hostUrl, url_path = base hostUrl ++ "/" ++ url_path u }
+
+    base = reverse . dropWhile (== '/') . dropWhile (/= '/') . reverse . url_path
+    errMsg = "You must 'get' or 'post' to something before making urls absolute"
 
 -- TODO: Move to tests
 testToAbsUrl :: Scraper()
