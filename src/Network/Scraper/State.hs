@@ -22,7 +22,7 @@ module Network.Scraper.State (
 
 import           Control.Applicative
 import           Control.Arrow                    ((***))
-import           Control.Lens                     ((^.))
+import           Control.Lens                     ((^.), (^?))
 import           Control.Monad
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.Trans.Class
@@ -34,7 +34,7 @@ import           Data.Maybe                       (fromJust, fromMaybe, isJust,
                                                    listToMaybe)
 import           Data.Monoid
 import qualified Data.Text                        as T
-import           Data.Text.Encoding               (encodeUtf8)
+import           Data.Text.Encoding               (encodeUtf8, decodeUtf8)
 import qualified Data.Text.IO                     as TIO
 import           Network.URL
 import           Network.Wreq                     (FormParam (..))
@@ -182,7 +182,7 @@ get urlStr = do
 
       r <- liftIO $ Sesh.getWith opts sesh urlStr'
       let html = r ^. Wreq.responseBody
-      setCurrentURL (Just url)
+      setCurrentUrlAfterRequest url r
       setCurrentHtml html
       setCurrentCursor (toCursor html)
       return html
@@ -213,9 +213,17 @@ post urlStr params = do
         let html = r ^. Wreq.responseBody
         setCurrentHtml html
         setCurrentCursor (toCursor html)
+        setCurrentUrlAfterRequest absURL r
+
         return html
 
     Nothing -> throwE ("invalid urlStr: " ++ urlStr)
+
+setCurrentUrlAfterRequest :: URL -> Wreq.Response body -> Scraper ()
+setCurrentUrlAfterRequest absURL r = do
+  let currentUrl = maybe absURL id $ toURL =<< r ^? Wreq.responseHeader "X-Wreq-Final-Request-URI"
+      toURL      = importURL . T.unpack . decodeUtf8
+  setCurrentURL $ Just currentUrl
 
 toAbsUrl :: URL -> Scraper(URL)
 toAbsUrl u@(URL (Absolute _) _ _) = return u
