@@ -5,5 +5,9 @@ packages:
     git: git@github.com:afcady/wreq
     commit: 5762ce9423e9158112123eba0a5bdceded8b3cec
 extra-deps:
-- wreq-0.4.0.0
-resolver: nightly-2015-06-17
+- conversion-1.2
+- conversion-bytestring-1.0.0.1
+- conversion-text-1.0.0.2
+- html-entities-1.1.0.0
+- text-1.2.2.0
+resolver: lts-5.2

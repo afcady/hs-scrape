@@ -17,11 +17,12 @@ module Network.Scraper.State (
   hasHide,
   getInputs,
   postToForm,
-  printFormNames
+  printFormNames,
+  toAbsUrl
   ) where
 
 import           Control.Applicative
-import           Control.Arrow                    ((***))
+import           Control.Arrow                    ((***), first)
 import           Control.Lens                     ((^.), (^?))
 import           Control.Monad
 import           Control.Monad.IO.Class           (liftIO)
@@ -47,6 +48,10 @@ import           Text.HTML.DOM                    (parseLBS)
 import qualified Text.XML                         as XML
 import           Text.XML.Cursor
 import qualified Text.XML.Cursor.Generic          as CG
+import Data.Maybe
+import Conversion
+import Conversion.Text
+import HTMLEntities.Decoder
 
 data ScraperState =
   PS { currentOptions :: Wreq.Options
@@ -277,6 +282,17 @@ getVisibleInputs  c = do
   M.fromList $ filter ((/= "") . fst) pairs
   where inputs = c $// element "input"
 
+getReasonableInputs :: Cursor -> M.Map T.Text T.Text
+getReasonableInputs  c = do
+  let mayPairs = map (\e -> (listToMaybe $ attribute "name" e, listToMaybe $ attribute "value" e, listToMaybe $ attribute "type" e)) inputs
+      pairs = mapMaybe f mayPairs
+      f (_, _, Just "submit")  = Nothing
+      f (Just "", _, _)        = Nothing
+      f (Just n, Just v, _)    = Just (n, convert $ htmlEncodedText v :: T.Text)
+      f _                      = Nothing
+  M.fromList pairs
+  where inputs = c $// element "input"
+
 data InpFilter a = Custom ([T.Text]) | AllVisible | AllInps deriving (Show)
 
 getInputs :: InpFilter a -> Cursor -> M.Map T.Text T.Text
@@ -288,7 +304,7 @@ getInputs (Custom paramFilterList) c = do
   M.filterWithKey (\k _ ->  not . any (== k) $ paramFilterList) m
   where inputs = c $// element "input"
 getInputs AllVisible c  = getVisibleInputs c
-getInputs AllInps c  = getAllInputs c
+getInputs AllInps c  = getReasonableInputs c
 
 getAllInputs :: Cursor -> M.Map T.Text T.Text
 getAllInputs  c = do
@@ -307,7 +323,7 @@ getLoginForm url = get url >>= return . getAllInputs . toCursor
 
 -- TODO: Move somewhere else???
 toWreqFormParams :: [(T.Text, T.Text)] -> [FormParam]
-toWreqFormParams params = map (\(k,v) -> k := v) (map (encodeUtf8 *** encodeUtf8) params)
+toWreqFormParams = map ((uncurry (:=)) . first encodeUtf8)
 
 -- TODO: Move somewhere else???
 linkWithText :: T.Text -> Cursor -> Maybe Cursor
