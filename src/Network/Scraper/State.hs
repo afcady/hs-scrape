@@ -284,12 +284,17 @@ getVisibleInputs  c = do
 
 getReasonableInputs :: Cursor -> M.Map T.Text T.Text
 getReasonableInputs  c = do
-  let mayPairs = map (\e -> (listToMaybe $ attribute "name" e, listToMaybe $ attribute "value" e, listToMaybe $ attribute "type" e)) inputs
+  let mayPairs = map (\e -> (listToMaybe $ attribute "name" e,
+                            listToMaybe $ attribute "value" e,
+                            listToMaybe $ attribute "type" e,
+                            listToMaybe $ attribute "checked" e)) inputs
       pairs = mapMaybe f mayPairs
-      f (_, _, Just "submit")  = Nothing
-      f (Just "", _, _)        = Nothing
-      f (Just n, Just v, _)    = Just (n, convert $ htmlEncodedText v :: T.Text)
-      f _                      = Nothing
+      f (_, _, Just "submit", _)          = Nothing
+      f (_, _, Just "radio", Nothing)     = Nothing
+      f (_, _, Just "checkbox", Nothing)  = Nothing
+      f (Just "", _, _, _)                = Nothing
+      f (Just n, Just v, _, _)            = Just (n, convert $ htmlEncodedText v :: T.Text)
+      f _                                 = Nothing
   M.fromList pairs
   where inputs = c $// element "input"
 
