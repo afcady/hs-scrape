@@ -8,6 +8,7 @@ module Network.Scraper.State (
   FormAttr(..),
   Scraper,
   getCurrentCursor,
+  getCurrentURL,
   toCursor,
   isDisplayed,
   hasDisplayNone,
